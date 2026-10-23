@@ -105,6 +105,28 @@ export function registerPowerShellLogics() {
   })
 
   register({
+    name: 'Whoami',
+    category: 'real',
+    summary: 'Shows the name saved for your PowerShellish session.',
+    usage: 'Whoami',
+    examples: ['Whoami'],
+    simulated: true,
+    run(context) {
+      const { first, last } = context.session.userName || {}
+      if (!first && !last) {
+        return {
+          type: 'text',
+          content: 'No name is saved for this PowerShellish session. Set one with Set-Name Kelvin Einstein. This browser simulation cannot read your Windows account.',
+        }
+      }
+      return {
+        type: 'text',
+        content: `${[first, last].filter(Boolean).join(' ')} (PowerShellish local session; simulated)`,
+      }
+    },
+  })
+
+  register({
     name: 'Set-Location',
     category: 'real',
     aliases: ['cd'],

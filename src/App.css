@@ -524,6 +524,26 @@
   color: var(--muted);
 }
 
+.ps-terminal-completion {
+  padding: 0 24px 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-family: var(--mono);
+}
+
+.ps-terminal-completion kbd,
+.ps-terminal-hint kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+}
+
+.ps-terminal-completion code {
+  color: var(--accent);
+}
+
 .ps-terminal-hint button {
   border: none;
   background: none;
