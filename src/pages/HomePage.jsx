@@ -1,5 +1,6 @@
 import Terminal from '../components/Terminal'
 import LocalSessionNotice from '../components/LocalSessionNotice'
+import { routeHref } from '../lib/routes'
 
 export default function HomePage({ engine, cwd, userName }) {
   return (
@@ -10,8 +11,8 @@ export default function HomePage({ engine, cwd, userName }) {
           <h1>Make friends with the<br /><em>command line</em><span className="period">.</span></h1>
           <p className="hero-description">PowerShellish is a browser-based PowerShell learning playground. Type commands, build a virtual workspace, edit files, and export your work. No account, no server, no cloud sync.</p>
           <div className="hero-actions">
-            <a className="button button-accent" href="/terminal/">Open workspace <span>↗</span></a>
-            <a className="text-link" href="/help/">Browse lessons <span>→</span></a>
+            <a className="button button-accent" href={routeHref('/terminal/')}>Open workspace <span>↗</span></a>
+            <a className="text-link" href={routeHref('/help/')}>Browse lessons <span>→</span></a>
           </div>
           <div className="hero-note">
             <span className="note-spark">✳</span>

@@ -11,18 +11,10 @@ import { registerPowerShellLogics } from './lib/commands/powershelllogics'
 import { registerPseudoLogics } from './lib/commands/pseudologic'
 import { loadTheme, saveTheme, loadWorkspace, saveWorkspace, clearWorkspace as clearWorkspaceStorage, loadUserName, saveUserName } from './lib/storage'
 import { downloadText } from './lib/zip'
+import { getPage, routeHref } from './lib/routes'
 
 registerPowerShellLogics()
 registerPseudoLogics()
-
-function getPage() {
-  const path = window.location.pathname.replace(/\/+$/, '') || '/'
-  if (path === '/terminal') return '/terminal/'
-  if (path === '/help') return '/help/'
-  if (path === '/terminal/') return '/terminal/'
-  if (path === '/help/') return '/help/'
-  return '/'
-}
 
 export default function App() {
   const [page, setPage] = useState(getPage)
@@ -76,8 +68,9 @@ export default function App() {
 
   const navigate = useCallback((to) => {
     const target = to.endsWith('/') ? to : `${to}/`
-    if (window.location.pathname !== target) {
-      window.history.pushState({}, '', target)
+    const href = routeHref(target)
+    if (window.location.pathname !== href) {
+      window.history.pushState({}, '', href)
     }
     setPage(getPage())
   }, [])
@@ -231,20 +224,20 @@ export default function App() {
     <div className="app-root">
       <header className="app-header">
         <div className="header-inner">
-          <a className="brand" href="/" onClick={(e) => { e.preventDefault(); navigate('/') }}>
+          <a className="brand" href={routeHref('/')} onClick={(e) => { e.preventDefault(); navigate('/') }}>
             <span className="brand-mark">&gt;_</span>
             <span className="brand-text">PowerShellish</span>
           </a>
           <nav className="app-nav">
-            <a href="/" className={page === '/' ? 'active' : ''} onClick={(e) => { e.preventDefault(); navigate('/') }}>Home</a>
-            <a href="/terminal/" className={page === '/terminal/' ? 'active' : ''} onClick={(e) => { e.preventDefault(); navigate('/terminal/') }}>Terminal</a>
-            <a href="/help/" className={page === '/help/' ? 'active' : ''} onClick={(e) => { e.preventDefault(); navigate('/help/') }}>Help</a>
+            <a href={routeHref('/')} className={page === '/' ? 'active' : ''} onClick={(e) => { e.preventDefault(); navigate('/') }}>Home</a>
+            <a href={routeHref('/terminal/')} className={page === '/terminal/' ? 'active' : ''} onClick={(e) => { e.preventDefault(); navigate('/terminal/') }}>Terminal</a>
+            <a href={routeHref('/help/')} className={page === '/help/' ? 'active' : ''} onClick={(e) => { e.preventDefault(); navigate('/help/') }}>Help</a>
           </nav>
           <div className="header-actions">
             <button type="button" className="theme-toggle" onClick={() => setTheme((t) => t === 'dark' ? 'light' : 'dark')}>
               {theme === 'dark' ? '☀ Light' : '☾ Dark'}
             </button>
-            <a className="header-cta" href="/terminal/" onClick={(e) => { e.preventDefault(); navigate('/terminal/') }}>Open Workspace ↗</a>
+            <a className="header-cta" href={routeHref('/terminal/')} onClick={(e) => { e.preventDefault(); navigate('/terminal/') }}>Open Workspace ↗</a>
           </div>
         </div>
       </header>

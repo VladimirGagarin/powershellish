@@ -16,11 +16,11 @@ export default function Terminal({ engine, cwd, userName, mode = 'full', idPrefi
     setInput(value)
   }
 
-  function getCompletions(value) {
+  function getCompletions(value, commandHistory) {
     const query = value.trimStart()
     if (!query) return []
     const normalizedQuery = query.toLocaleLowerCase()
-    const historyMatches = [...commands.current].reverse()
+    const historyMatches = [...commandHistory].reverse()
       .filter((command) => command.toLocaleLowerCase().startsWith(normalizedQuery) && command !== value)
     const commandMatches = query.includes(' ')
       ? []
@@ -30,7 +30,9 @@ export default function Terminal({ engine, cwd, userName, mode = 'full', idPrefi
     return [...new Set([...historyMatches, ...commandMatches])]
   }
 
-  const previewCompletion = getCompletions(input)[0]
+  const commandHistory = history.filter((item) => item.type === 'input').slice(-50).map((item) => item.text)
+  const completionSuggestions = getCompletions(input, commandHistory)
+  const previewCompletion = completionSuggestions[0]
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -40,9 +42,12 @@ export default function Terminal({ engine, cwd, userName, mode = 'full', idPrefi
     if (!commandRequest) return
     const command = typeof commandRequest === 'string' ? commandRequest : commandRequest.command
     if (!command) return
-    changeInput(command)
     terminalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    inputRef.current?.focus()
+    const frame = requestAnimationFrame(() => {
+      changeInput(command)
+      inputRef.current?.focus()
+    })
+    return () => cancelAnimationFrame(frame)
   }, [commandRequest])
 
   useEffect(() => {
@@ -70,7 +75,7 @@ export default function Terminal({ engine, cwd, userName, mode = 'full', idPrefi
       if (completion.current.value === input && candidates.length) {
         nextIndex = (completion.current.index + 1) % candidates.length
       } else {
-        candidates = getCompletions(input)
+        candidates = getCompletions(input, commands.current)
         nextIndex = 0
       }
       if (!candidates.length) return
@@ -170,7 +175,7 @@ export default function Terminal({ engine, cwd, userName, mode = 'full', idPrefi
       {input && (
         <div className="ps-terminal-completion" role="status" aria-live="polite">
           {previewCompletion
-            ? <>Press <kbd>Tab</kbd> to complete: <code>{previewCompletion}</code>{getCompletions(input).length > 1 ? ` · +${getCompletions(input).length - 1} more` : ''}</>
+            ? <>Press <kbd>Tab</kbd> to complete: <code>{previewCompletion}</code>{completionSuggestions.length > 1 ? ` · +${completionSuggestions.length - 1} more` : ''}</>
             : <>No matches yet. Keep typing a command or use <kbd>↑</kbd> for command history.</>}
         </div>
       )}
