@@ -1,15 +1,53 @@
 import { useEffect, useRef, useState } from 'react'
 import { list as listCommands } from '../lib/commands/registry.js'
+import { downloadText } from '../lib/zip.js'
+import WorkspaceGuide from './WorkspaceGuide'
 
 export default function Terminal({ engine, cwd, userName, mode = 'full', idPrefix = 'terminal', commandRequest = null }) {
   const [input, setInput] = useState('')
+  const [showWorkspaceGuide, setShowWorkspaceGuide] = useState(() => {
+    if (mode !== 'full' || idPrefix !== 'workspace') return false
+    try {
+      const alreadySeen = window.sessionStorage.getItem('ps-workspace-guide-seen-v2') === 'true'
+      if (!alreadySeen) window.sessionStorage.setItem('ps-workspace-guide-seen-v2', 'true')
+      return !alreadySeen
+    } catch {
+      return true
+    }
+  })
+  const [forceRootChoice, setForceRootChoice] = useState(false)
+  const [guideMode, setGuideMode] = useState('welcome')
   const [history, setHistory] = useState([])
+  const [pathError, setPathError] = useState('')
   const [historyIndex, setHistoryIndex] = useState(-1)
   const inputRef = useRef(null)
   const logRef = useRef(null)
   const terminalRef = useRef(null)
   const commands = useRef([])
   const completion = useRef({ value: '', candidates: [], index: -1 })
+  const pathErrorTimer = useRef(null)
+  const workingDirectory = engine.context.session.cwd ?? cwd ?? ''
+  const userFolder = String(userName?.first || 'guest').trim().replace(/[^a-z0-9_-]/gi, '') || 'guest'
+  const rootPath = `C:\\PS\\${userFolder}`
+
+  useEffect(() => {
+    function onChooseWorkingDirectory() {
+      setForceRootChoice(true)
+      setGuideMode('recovery')
+      setShowWorkspaceGuide(true)
+    }
+    function onCreateWorkspace() {
+      setForceRootChoice(true)
+      setGuideMode('create-workspace')
+      setShowWorkspaceGuide(true)
+    }
+    window.addEventListener('ps:choose-working-directory', onChooseWorkingDirectory)
+    window.addEventListener('ps:create-workspace', onCreateWorkspace)
+    return () => {
+      window.removeEventListener('ps:choose-working-directory', onChooseWorkingDirectory)
+      window.removeEventListener('ps:create-workspace', onCreateWorkspace)
+    }
+  }, [])
 
   function changeInput(value) {
     completion.current = { value: '', candidates: [], index: -1 }
@@ -22,12 +60,56 @@ export default function Terminal({ engine, cwd, userName, mode = 'full', idPrefi
     const normalizedQuery = query.toLocaleLowerCase()
     const historyMatches = [...commandHistory].reverse()
       .filter((command) => command.toLocaleLowerCase().startsWith(normalizedQuery) && command !== value)
-    const commandMatches = query.includes(' ')
-      ? []
-      : listCommands()
+    let contextualMatches = []
+
+    if (!/\s/.test(query)) {
+      contextualMatches = listCommands()
         .flatMap((command) => [command.name, ...(command.aliases || [])])
         .filter((name) => name.toLocaleLowerCase().startsWith(normalizedQuery) && name !== value)
-    return [...new Set([...historyMatches, ...commandMatches])]
+    } else {
+      const commandName = query.match(/^\S+/)?.[0]
+      const command = engine.context.registry.resolve(commandName)
+      const splitAt = query.search(/\s+[^\s]*$/)
+      const tokenStart = splitAt < 0 ? query.length : splitAt + query.slice(splitAt).search(/\S|$/)
+      const prefix = query.slice(0, tokenStart)
+      const fragment = query.slice(tokenStart)
+      const priorTokens = prefix.trim().split(/\s+/).filter(Boolean)
+      const previousToken = priorTokens.at(-1) || ''
+      const pathParameter = /^-(Path|LiteralPath)$/i.test(previousToken)
+      const parameterValue = previousToken.startsWith('-')
+      const hasPathParameter = command?.parameters?.some((parameter) => /^-?(Path|LiteralPath)$/i.test(parameter.name))
+      const positionalPath = hasPathParameter && priorTokens.length === 1
+      const quote = fragment.match(/^['"]/)?.[0] || ''
+      const currentFragment = fragment.replace(/^['"]|['"]$/g, '')
+
+      if (parameterValue && commandName?.toLowerCase() === 'new-item' && /^-itemtype$/i.test(previousToken)) {
+        contextualMatches = ['File', 'Directory']
+          .filter((item) => item.toLowerCase().startsWith(currentFragment.toLowerCase()))
+          .map((item) => `${prefix}${item}`)
+      } else if (fragment.startsWith('-') || (!fragment && !pathParameter)) {
+        const alreadyUsed = new Set(priorTokens.filter((token) => token.startsWith('-')).map((token) => token.toLowerCase()))
+        contextualMatches = (command?.parameters || [])
+          .map((parameter) => parameter.name.startsWith('-') ? parameter.name : `-${parameter.name}`)
+          .filter((name) => name.toLowerCase().startsWith(fragment.toLowerCase()) && !alreadyUsed.has(name.toLowerCase()))
+          .map((name) => `${prefix}${name} `)
+      } else if (pathParameter || positionalPath) {
+        const partialPath = currentFragment
+        const slashIndex = partialPath.lastIndexOf('/')
+        const parentPath = slashIndex >= 0 ? partialPath.slice(0, slashIndex) : ''
+        const namePrefix = partialPath.slice(slashIndex + 1).toLowerCase()
+        const result = engine.context.vfs.list(parentPath, engine.context.session.cwd ?? cwd ?? '')
+        contextualMatches = (result.items || [])
+          .filter((item) => item.name.toLowerCase().startsWith(namePrefix))
+          .map((item) => {
+            const completedPath = `${parentPath ? `${parentPath}/` : ''}${item.name}${item.type === 'Directory' ? '/' : ''}`
+            const quoteCharacter = quote || (item.name.includes(' ') ? '"' : '')
+            const quotedPath = quoteCharacter ? `${quoteCharacter}${completedPath}${quoteCharacter}` : completedPath
+            return `${prefix}${quotedPath}`
+          })
+      }
+    }
+
+    return [...new Set([...historyMatches, ...contextualMatches])]
   }
 
   const commandHistory = history.filter((item) => item.type === 'input').slice(-50).map((item) => item.text)
@@ -56,6 +138,38 @@ export default function Terminal({ engine, cwd, userName, mode = 'full', idPrefi
     }
   }, [history])
 
+  useEffect(() => () => clearTimeout(pathErrorTimer.current), [])
+
+  useEffect(() => {
+    function onFileSaved(event) {
+      const path = event.detail?.path
+      if (!path) return
+      setHistory((prev) => [...prev, {
+        type: 'output',
+        text: `Saved ${path} in your virtual workspace. Download a copy to keep a backup.`,
+        downloadPath: path,
+      }])
+    }
+    window.addEventListener('ps:file-saved', onFileSaved)
+    return () => window.removeEventListener('ps:file-saved', onFileSaved)
+  }, [])
+
+  function downloadWorkspaceFile(path) {
+    const result = engine.context.vfs.read(path, '')
+    if (result.error) {
+      setHistory((prev) => [...prev, { type: 'output', text: `Download failed: ${result.error}` }])
+      return
+    }
+    downloadText(result.path.split('/').pop() || 'workspace-file.txt', result.content || '')
+  }
+
+  function loadGuideCommand(command) {
+    changeInput(command)
+    setShowWorkspaceGuide(false)
+    setForceRootChoice(false)
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }
+
   function runCommand(value = input) {
     const trimmed = value.trim()
     if (!trimmed) return
@@ -63,7 +177,12 @@ export default function Terminal({ engine, cwd, userName, mode = 'full', idPrefi
     completion.current = { value: '', candidates: [], index: -1 }
     setHistoryIndex(-1)
     const result = engine.execute(trimmed)
-    setHistory((prev) => [...prev, { type: 'input', text: trimmed }, { type: 'output', text: result.content || '' }])
+    setHistory((prev) => [...prev, { type: 'input', text: trimmed }, { type: 'output', text: result.content || '', downloadPath: result.downloadPath }])
+    if (result.notification?.type === 'path-error') {
+      setPathError(result.notification.message)
+      clearTimeout(pathErrorTimer.current)
+      pathErrorTimer.current = setTimeout(() => setPathError(''), 6000)
+    }
     setInput('')
   }
 
@@ -116,13 +235,19 @@ export default function Terminal({ engine, cwd, userName, mode = 'full', idPrefi
     }
   }
 
-  const promptPath = cwd ? `~/${cwd}` : '~'
+  const promptPath = `${rootPath}${workingDirectory ? `\\${workingDirectory.replace(/\//g, '\\')}` : ''}`
+  const folderPickerPath = forceRootChoice ? '' : workingDirectory
+  const currentFolderItems = engine.context.vfs.list(folderPickerPath, '')
+  const childDirectories = (currentFolderItems.items || [])
+    .filter((item) => item.type === 'Directory')
+    .map((item) => ({ name: item.name, path: item.path }))
   const fullName = [userName?.first, userName?.last].filter(Boolean).join(' ')
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
 
   return (
     <div ref={terminalRef} className={`ps-terminal ${mode === 'compact' ? 'ps-terminal-compact' : 'ps-terminal-full'}`} role="region" aria-label="PowerShellish terminal">
+      {pathError && <div className="path-error-banner" role="alert"><span>{pathError}</span><button type="button" aria-label="Dismiss path error" onClick={() => { clearTimeout(pathErrorTimer.current); setPathError('') }}>×</button></div>}
       <div className="ps-terminal-header">
         <div className="ps-terminal-dots">
           <span />
@@ -150,7 +275,10 @@ export default function Terminal({ engine, cwd, userName, mode = 'full', idPrefi
                 <span className="ps-typed">{item.text}</span>
               </div>
             ) : (
-              <pre className="ps-output">{item.text || ' '}</pre>
+              <>
+                <pre className="ps-output">{item.text || ' '}</pre>
+                {item.downloadPath && <button type="button" className="ps-file-download" onClick={() => downloadWorkspaceFile(item.downloadPath)}>Download backup</button>}
+              </>
             )}
           </div>
         ))}
@@ -170,7 +298,6 @@ export default function Terminal({ engine, cwd, userName, mode = 'full', idPrefi
           spellCheck="false"
           aria-label="Terminal command input"
         />
-        <span className="ps-cursor" />
       </form>
       {input && (
         <div className="ps-terminal-completion" role="status" aria-live="polite">
@@ -182,6 +309,25 @@ export default function Terminal({ engine, cwd, userName, mode = 'full', idPrefi
       <div className="ps-terminal-hint">
         <span>↵</span> Enter to run · <kbd>Tab</kbd> to complete · <kbd>↑</kbd> history · <button type="button" onClick={() => runCommand('Get-ChildItem')}>Get-ChildItem</button> · <button type="button" onClick={() => runCommand('Get-Help')}>Get-Help</button>
       </div>
+      {showWorkspaceGuide && (
+        <WorkspaceGuide
+          rootPath={rootPath}
+          defaultPath={`${rootPath}\\workspace`}
+          currentPath={promptPath}
+          canGoUp={Boolean(workingDirectory)}
+          forceRootChoice={forceRootChoice}
+          guideMode={guideMode}
+          directories={childDirectories}
+          onChoose={loadGuideCommand}
+          onCreateWorkingDirectory={(name) => {
+            runCommand(`New-WorkingDirectory -Name "${name}"`)
+            setShowWorkspaceGuide(false)
+            setForceRootChoice(false)
+            setGuideMode('welcome')
+          }}
+          onClose={() => { setShowWorkspaceGuide(false); setForceRootChoice(false); setGuideMode('welcome') }}
+        />
+      )}
     </div>
   )
 }

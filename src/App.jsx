@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 import HomePage from './pages/HomePage'
 import TerminalPage from './pages/TerminalPage'
 import HelpPage from './pages/HelpPage'
 import ConfirmDialog from './components/ConfirmDialog'
-import { createVfs, getPath, importFiles, listChildren, newItem, readFile, removeItem, renameItem, writeFile } from './lib/vfs'
+import { createVfs, getPath, importFiles, listChildren, migrateVfs, newItem, readFile, removeItem, renameItem, writeFile } from './lib/vfs'
 import { createEngine } from './lib/engine'
+import { displayPath, normalizePath } from './lib/paths'
 import * as registry from './lib/commands/registry'
 import { registerPowerShellLogics } from './lib/commands/powershelllogics'
 import { registerPseudoLogics } from './lib/commands/pseudologic'
@@ -16,6 +17,16 @@ import { getPage, routeHref } from './lib/routes'
 registerPowerShellLogics()
 registerPseudoLogics()
 
+function readWorkingDirectoryFromUrl() {
+  try {
+    const value = new URLSearchParams(window.location.search).get('wd') || 'workspace'
+    const result = normalizePath(value, '')
+    return result.ok ? result.path : 'workspace'
+  } catch {
+    return 'workspace'
+  }
+}
+
 export default function App() {
   const [page, setPage] = useState(getPage)
   const [theme, setTheme] = useState(() => {
@@ -25,7 +36,8 @@ export default function App() {
     return 'light'
   })
   const [nodes, setNodes] = useState(() => createVfs())
-  const [session, setSession] = useState({ cwd: '', history: [], editorBuffer: '' })
+  const [workspaceReady, setWorkspaceReady] = useState(false)
+  const [session, setSession] = useState(() => ({ cwd: readWorkingDirectoryFromUrl(), history: [], editorBuffer: '' }))
   const [userName, setUserName] = useState(loadUserName)
   const [editor, setEditor] = useState({ open: false, path: '', content: '' })
   const [deleteRequest, setDeleteRequest] = useState(null)
@@ -35,8 +47,7 @@ export default function App() {
   const [exportRequest, setExportRequest] = useState(null)
   const [exportPath, setExportPath] = useState('')
   const [exportFormat, setExportFormat] = useState('raw')
-  const saveTimerRef = useRef(null)
-  const fileInputRef = useRef(null)
+  const [undoStack, setUndoStack] = useState([])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -44,24 +55,26 @@ export default function App() {
   }, [theme])
 
   useEffect(() => {
+    let active = true
     loadWorkspace().then((snapshot) => {
-      if (snapshot) setNodes(snapshot)
+      if (!active) return
+      setNodes(snapshot ? migrateVfs(snapshot, readWorkingDirectoryFromUrl()) : createVfs())
+      setWorkspaceReady(true)
     })
+    return () => { active = false }
   }, [])
 
-  const autosave = useCallback(() => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(() => {
-      saveWorkspace(nodes)
-    }, 600)
-  }, [nodes])
+  useEffect(() => {
+    if (!workspaceReady) return undefined
+    const timer = setTimeout(() => saveWorkspace(nodes), 600)
+    return () => clearTimeout(timer)
+  }, [nodes, workspaceReady])
 
   useEffect(() => {
-    autosave()
-  }, [nodes, autosave])
-
-  useEffect(() => {
-    const onPop = () => setPage(getPage())
+    const onPop = () => {
+      setPage(getPage())
+      setSession((prev) => ({ ...prev, cwd: readWorkingDirectoryFromUrl() }))
+    }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
@@ -75,35 +88,54 @@ export default function App() {
     setPage(getPage())
   }, [])
 
+  const openImport = useCallback(() => {
+    document.getElementById('workspace-import-input')?.click()
+  }, [])
+
+  const commitNodes = useCallback((nextNodes) => {
+    const updatedNodes = typeof nextNodes === 'function' ? nextNodes(nodes) : nextNodes
+    if (updatedNodes === nodes) return
+    setUndoStack((stack) => [...stack, nodes].slice(-20))
+    setNodes(updatedNodes)
+  }, [nodes])
+
+  const undoWorkspace = useCallback(() => {
+    if (!undoStack.length) return false
+    const previousNodes = undoStack[undoStack.length - 1]
+    setUndoStack((stack) => stack.slice(0, -1))
+    setNodes(previousNodes)
+    return true
+  }, [undoStack])
+
   const vfsApi = useMemo(() => ({
     nodes,
     list: (path, cwd) => listChildren(nodes, path, cwd),
     read: (path, cwd) => readFile(nodes, path, cwd),
     write: (path, content, cwd, append) => {
       const res = writeFile(nodes, path, content, cwd, append)
-      if (res.ok) setNodes(res.nodes)
+      if (res.ok) commitNodes(res.nodes)
       return res
     },
     newItem: (itemType, path, cwd) => {
       const res = newItem(nodes, itemType, path, cwd)
-      if (res.ok) setNodes(res.nodes)
+      if (res.ok) commitNodes(res.nodes)
       return res
     },
     remove: (path, cwd, confirmed = false) => {
       const res = removeItem(nodes, path, cwd, confirmed)
-      if (res.ok) setNodes(res.nodes)
+      if (res.ok) commitNodes(res.nodes)
       return res
     },
     rename: (path, newName, cwd) => {
       const res = renameItem(nodes, path, newName, cwd)
-      if (res.ok) setNodes(res.nodes)
+      if (res.ok) commitNodes(res.nodes)
       return res
     },
-  }), [nodes])
+  }), [nodes, commitNodes])
 
   const actions = useMemo(() => ({
-    autosave,
     navigate,
+    undoWorkspace,
     requestDelete: (req) => setDeleteRequest(req),
     requestClearWorkspace: () => setClearRequest(true),
     openClipboard: (text) => { setClipboardText(text); setClipboardNotice('') },
@@ -117,20 +149,34 @@ export default function App() {
       setExportFormat(format)
       setExportRequest({})
     },
-    openImport: () => {
-      if (fileInputRef.current) fileInputRef.current.click()
+    openImport,
+    openFile: (path) => {
+      const result = vfsApi.read(path, '')
+      if (result.error) return false
+      setSession((prev) => ({ ...prev, editorBuffer: result.content }))
+      setEditor({ open: true, path: result.path || path, content: result.content })
+      return true
     },
-  }), [autosave, navigate])
+    setWorkingDirectory: (path) => {
+      setSession((prev) => ({ ...prev, cwd: path }))
+      const url = new URL(window.location.href)
+      if (path) url.searchParams.set('wd', path)
+      else url.searchParams.delete('wd')
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+    },
+    requestWorkingDirectory: () => window.dispatchEvent(new CustomEvent('ps:choose-working-directory')),
+    requestNewWorkspace: () => window.dispatchEvent(new CustomEvent('ps:create-workspace')),
+  }), [navigate, undoWorkspace, openImport, vfsApi])
 
   const engineSession = useMemo(() => ({ ...session, userName }), [session, userName])
   const engine = useMemo(() => createEngine({
     vfs: vfsApi,
     session: engineSession,
     registry,
-    paths: { displayPath: (p) => (p ? `C:\\workspace\\${p.replace(/\//g, '\\')}` : 'C:\\workspace') },
+    paths: { displayPath: (path) => displayPath(path, userName?.first || 'guest') },
     navigate,
     actions,
-  }), [vfsApi, navigate, actions, engineSession])
+  }), [vfsApi, navigate, actions, engineSession, userName?.first])
 
   function onOpenFile(path) {
     const result = vfsApi.read(path, session.cwd)
@@ -142,7 +188,10 @@ export default function App() {
   function onSaveEditor() {
     if (!editor.path) return
     const res = vfsApi.write(editor.path, editor.content, session.cwd, false)
-    if (res.ok) setSession((prev) => ({ ...prev, editorBuffer: editor.content }))
+    if (res.ok) {
+      setSession((prev) => ({ ...prev, editorBuffer: editor.content }))
+      window.dispatchEvent(new CustomEvent('ps:file-saved', { detail: { path: res.path || editor.path } }))
+    }
   }
 
   function onExportEditor() {
@@ -158,8 +207,6 @@ export default function App() {
   const currentExportExtension = selectedExportFile?.name.includes('.')
     ? `.${selectedExportFile.name.split('.').pop()}`
     : 'No extension'
-  const userDisplayName = [userName?.first, userName?.last].filter(Boolean).join(' ')
-
   function onConfirmExport() {
     if (!selectedExportPath) return
     const result = vfsApi.read(selectedExportPath, '')
@@ -185,8 +232,7 @@ export default function App() {
 
   function onConfirmDelete() {
     if (!deleteRequest) return
-    const res = vfsApi.remove(deleteRequest.path, session.cwd, true)
-    if (res.ok) setNodes(res.nodes)
+    vfsApi.remove(deleteRequest.path, session.cwd, true)
     setDeleteRequest(null)
   }
 
@@ -195,11 +241,11 @@ export default function App() {
   }
 
   function onConfirmClear() {
-    setNodes(createVfs())
+    commitNodes(createVfs())
     clearWorkspaceStorage()
     setClearRequest(false)
     setEditor({ open: false, path: '', content: '' })
-    setSession({ cwd: '', history: [], editorBuffer: '' })
+    setSession({ cwd: 'workspace', history: [], editorBuffer: '' })
   }
 
   function onCancelClear() {
@@ -211,7 +257,7 @@ export default function App() {
     const fileList = Array.from(input.files || [])
     Promise.all(fileList.map((file) => file.text().then((text) => ({ name: file.name, text })))).then((files) => {
       const res = importFiles(nodes, files, session.cwd)
-      if (res.ok) setNodes(res.nodes)
+      if (res.ok) commitNodes(res.nodes)
     })
     input.value = ''
   }
@@ -259,12 +305,15 @@ export default function App() {
             clearRequest={clearRequest}
             onConfirmClear={onConfirmClear}
             onCancelClear={onCancelClear}
-            onImport={() => fileInputRef.current?.click()}
+            onImport={openImport}
             onRefresh={onRefresh}
+            onUndo={undoWorkspace}
+            undoCount={undoStack.length}
           />
         )}
         {page === '/help/' && <HelpPage engine={engine} cwd={session.cwd} userName={userName} />}
       </main>
+      {!workspaceReady && <div className="workspace-loading" role="status" aria-live="polite">Opening your local workspace…</div>}
 
       <ConfirmDialog
         open={!!deleteRequest}
@@ -333,7 +382,7 @@ export default function App() {
         </div>
       )}
 
-      <input ref={fileInputRef} type="file" multiple accept=".txt,.md,.ps1,.psm1,.psd1,.json,.csv,.log,.xml,.html,.css,.js,.yml,.yaml,.ini,.config" style={{ display: 'none' }} onChange={onImportFiles} />
+      <input id="workspace-import-input" type="file" multiple accept=".txt,.md,.ps1,.psm1,.psd1,.json,.csv,.log,.xml,.html,.css,.js,.yml,.yaml,.ini,.config" style={{ display: 'none' }} onChange={onImportFiles} />
     </div>
   )
 }

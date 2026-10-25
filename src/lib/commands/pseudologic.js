@@ -1,5 +1,5 @@
 import { register } from './registry.js'
-import { displayPath } from '../paths.js'
+import { displayPath as formatPath } from '../paths.js'
 import { buildZip, downloadBlob, downloadText, timestamp } from '../zip.js'
 
 function getSwitch(params, name) {
@@ -28,7 +28,28 @@ function getParameter(params, names) {
   return key ? params[key] : undefined
 }
 
+function displayPath(path, context) {
+  return formatPath(path, context?.session?.userName?.first || 'guest')
+}
+
 export function registerPseudoLogics() {
+  register({
+    name: 'Undo-Workspace',
+    category: 'custom',
+    summary: 'Restores the previous workspace state from this browser session.',
+    usage: 'Undo-Workspace',
+    examples: ['Undo-Workspace'],
+    run(context) {
+      const undone = context.actions?.undoWorkspace?.()
+      return {
+        type: 'text',
+        content: undone
+          ? 'Restored the previous workspace state. Use Export-Workspace regularly to keep a backup.'
+          : 'There is no workspace change to undo in this session.',
+      }
+    },
+  })
+
   register({
     name: 'Set-Name',
     category: 'custom',
@@ -133,6 +154,42 @@ export function registerPseudoLogics() {
   })
 
   register({
+    name: 'Edit-File',
+    aliases: ['Open-File'],
+    category: 'custom',
+    summary: 'Opens a virtual workspace text file in the in-app editor.',
+    usage: 'Edit-File -Path <path>',
+    parameters: [{ name: '-Path', required: true, description: 'The workspace file to open.' }],
+    examples: ['Edit-File -Path script.js', 'Open-File notes.txt'],
+    run(context, args, params) {
+      const path = params.Path || params.LiteralPath || args[0]
+      if (!path) return { type: 'text', content: 'Edit-File: Add -Path and a file name. Example: Edit-File -Path script.js.' }
+      const result = context.vfs.read(path, context.session.cwd || '')
+      if (result.error) return { type: 'text', content: `Edit-File: ${result.error}` }
+      context.actions?.openFile?.(result.path || path)
+      return { type: 'text', content: `Opened ${displayPath(result.path || path, context)} in the editor. Make your changes and choose Save. Use Export-File to download a copy.` }
+    },
+  })
+
+  register({
+    name: 'New-WorkingDirectory',
+    category: 'custom',
+    summary: 'Creates a folder in the virtual workspace and makes it your current folder.',
+    usage: 'New-WorkingDirectory -Name <folder-name>',
+    parameters: [{ name: '-Name', required: true, description: 'Name for the new working folder.' }],
+    examples: ['New-WorkingDirectory -Name projects', 'New-WorkingDirectory -Name "my work"'],
+    run(context, args, params) {
+      const name = params.Name || params.name || args[0]
+      if (!name) return { type: 'text', content: 'New-WorkingDirectory: Add -Name and a folder name, like New-WorkingDirectory -Name projects.' }
+      const result = context.vfs.newItem('Directory', name, '')
+      if (!result.ok) return { type: 'text', content: `New-WorkingDirectory: ${result.error}` }
+      context.session.cwd = result.path
+      context.actions?.setWorkingDirectory?.(result.path)
+      return { type: 'text', content: `Created ${displayPath(result.path, context)} and made it your current working directory.` }
+    },
+  })
+
+  register({
     name: 'Save-Changes',
     category: 'custom',
     summary: 'Saves the current editor buffer or exports changes.',
@@ -150,13 +207,12 @@ export function registerPseudoLogics() {
       }
       const result = context.vfs.write(path, context.session.editorBuffer, context.session.cwd || '', false)
       if (!result.ok) return { type: 'text', content: `Save-Changes: ${result.error}` }
-      context.actions?.autosave?.()
       if (params.Export) {
         const name = path.split('/').pop() || 'file.txt'
         downloadText(name, context.session.editorBuffer || '')
-        return { type: 'text', content: `Saved ${displayPath(result.path)} and downloaded ${name}.` }
+        return { type: 'text', content: `Saved ${displayPath(result.path, context)} and downloaded ${name}.` }
       }
-      return { type: 'text', content: `Saved editor buffer to ${displayPath(result.path)}.` }
+      return { type: 'text', content: `Saved editor buffer to ${displayPath(result.path, context)}.` }
     },
   })
 
@@ -325,4 +381,72 @@ export function registerPseudoLogics() {
       return { type: 'text', content: messages[Math.floor(Math.random() * messages.length)] }
     },
   })
+
+  register({
+    name: 'Get-Pli5',
+    category: 'custom',
+    summary: 'Open PowerShell Like I\'m 5 tutorials on the Help page.',
+    usage: 'Get-Pli5',
+    aliases: ['Open-Pli5', 'Show-Pli5', 'Get-PowershellLikeIm5'],
+    examples: ['Get-Pli5'],
+    run(context) {
+      if (typeof context.navigate === 'function') {
+        context.navigate('/help/')
+      } else if (context.actions?.navigate) {
+        context.actions.navigate('/help/')
+      }
+      if (typeof window !== 'undefined') {
+        window.location.hash = '#pli5'
+        window.dispatchEvent(new CustomEvent('ps:go-pli5'))
+      }
+      return { type: 'text', content: 'Opening PowerShell Like I\'m 5 tutorials on /help/ ...' }
+    },
+  })
+
+  register({
+    name: 'Open-Tutorial',
+    category: 'custom',
+    summary: 'Open tutorials on the Help page.',
+    usage: 'Open-Tutorial [[-Name] <string>]',
+    aliases: ['Get-Tutorial', 'Show-Tutorial'],
+    parameters: [
+      { name: '-Name', required: false, description: 'Tutorial name or pli5' },
+    ],
+    examples: ['Open-Tutorial', 'Open-Tutorial -Name pli5'],
+    run(context, args, params) {
+      const name = (params.Name || params.name || args[0] || '').toString().toLowerCase()
+      if (typeof context.navigate === 'function') {
+        context.navigate('/help/')
+      } else if (context.actions?.navigate) {
+        context.actions.navigate('/help/')
+      }
+      if (name.includes('pli5') || name.includes('5') || name.includes('powershell')) {
+        if (typeof window !== 'undefined') {
+          window.location.hash = '#pli5'
+          window.dispatchEvent(new CustomEvent('ps:go-pli5'))
+        }
+        return { type: 'text', content: 'Opening PowerShell Like I\'m 5 tutorials...' }
+      }
+      if (typeof window !== 'undefined') {
+        window.location.hash = '#tutorials'
+      }
+      return { type: 'text', content: 'Opening tutorials on /help/ ...' }
+    },
+  })
+
+  const playfulCommands = [
+    { name: 'Get-Compliment', summary: 'Prints a friendly bit of encouragement.', usage: 'Get-Compliment', examples: ['Get-Compliment'], run() { return { type: 'text', content: ['You are learning one brave command at a time!', 'Your curiosity is a superpower.', 'Great job making something new today!'][Math.floor(Math.random() * 3)] } } },
+    { name: 'Get-PowerShellFact', summary: 'Shares a bite-sized PowerShell fact.', usage: 'Get-PowerShellFact', examples: ['Get-PowerShellFact'], run() { return { type: 'text', content: 'PowerShell commands often use Verb-Noun names, like Get-Help. PowerShellish simulates commands safely in your browser.' } } },
+    { name: 'Get-Color', summary: 'Picks a cheerful color at random.', usage: 'Get-Color', examples: ['Get-Color'], run() { return { type: 'text', content: ['Red ❤️', 'Blue 💙', 'Yellow 💛', 'Green 💚', 'Purple 💜'][Math.floor(Math.random() * 5)] } } },
+    { name: 'Get-Choose', summary: 'Flips a pretend coin for a random choice.', usage: 'Get-Choose', examples: ['Get-Choose'], run() { return { type: 'text', content: Math.random() < 0.5 ? 'Heads! 🪙' : 'Tails! 🪙' } } },
+    { name: 'Get-Countdown', summary: 'Counts down from five to one.', usage: 'Get-Countdown', examples: ['Get-Countdown'], run() { return { type: 'text', content: '5... 4... 3... 2... 1... Go! 🚀' } } },
+    { name: 'Get-Emoji', summary: 'Shows a friendly random emoji.', usage: 'Get-Emoji', examples: ['Get-Emoji'], run() { return { type: 'text', content: ['🐢', '🌈', '🦊', '🚀', '⭐', '🐸'][Math.floor(Math.random() * 6)] } } },
+    { name: 'Write-Tip', summary: 'Shares a small tip for learning commands.', usage: 'Write-Tip', examples: ['Write-Tip'], run() { return { type: 'text', content: 'Tip: Try Get-Help followed by a command name when you want to learn what it does.' } } },
+    { name: 'Imagine-Story', summary: 'Starts a tiny make-believe coding story.', usage: 'Imagine-Story', examples: ['Imagine-Story'], run() { return { type: 'text', content: 'A curious robot found a folder of mystery notes. It used Get-ChildItem to see what was inside, then read one note with Get-Content!' } } },
+    { name: 'Dream-Big', summary: 'Prints a reminder to keep exploring and building.', usage: 'Dream-Big', examples: ['Dream-Big'], run() { return { type: 'text', content: 'Big ideas start with one small step. Keep learning, keep trying, and build something you are proud of!' } } },
+    { name: 'Celebrate-Progress', summary: 'Celebrates the commands you have learned so far.', usage: 'Celebrate-Progress', examples: ['Celebrate-Progress'], run() { return { type: 'text', content: '🎉 Hooray! You showed up, tried a command, and learned something. That is progress!' } } },
+    { name: 'Remember-Lesson', summary: 'Reminds you that practice helps commands feel familiar.', usage: 'Remember-Lesson', examples: ['Remember-Lesson'], run() { return { type: 'text', content: 'Remember: Get-ChildItem looks around, Get-Content reads a file, and Export-File downloads a copy.' } } },
+  ]
+
+  for (const command of playfulCommands) register({ category: 'custom', ...command })
 }

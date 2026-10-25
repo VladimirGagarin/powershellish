@@ -1,5 +1,6 @@
 const LS_THEME = 'powershellish-theme'
 const LS_PREFS = 'powershellish-prefs'
+const LS_LESSON_PROGRESS = 'powershellish-lesson-progress'
 const DB_NAME = 'powershellish-vfs'
 const STORE = 'workspace'
 const KEY = 'snapshot'
@@ -106,6 +107,24 @@ export function loadUserName() {
 export function saveUserName(userName) {
   const prefs = loadPrefs() || {}
   return savePrefs({ ...prefs, userName })
+}
+
+export function loadLessonProgress() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LS_LESSON_PROGRESS) || '[]')
+    return Array.isArray(saved) ? saved.filter((id) => typeof id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+export function saveLessonProgress(completedIds) {
+  try {
+    localStorage.setItem(LS_LESSON_PROGRESS, JSON.stringify([...new Set(completedIds)]))
+    return true
+  } catch {
+    return false
+  }
 }
 
 export function storageAvailable() {

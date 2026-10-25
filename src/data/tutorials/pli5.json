@@ -1,0 +1,265 @@
+{
+  "sectionId": "pli5",
+  "sectionTitle": "PowerShell Like I'm 5 / PLI5",
+  "lessons": [
+    {
+      "id": "pipes-conveyor-belt",
+      "title": "Pipes: Pass It Along!",
+      "description": "Use a pipe to pass things from one command to another.",
+      "order": 1,
+      "durationMinutes": 3,
+      "slides": [
+        {
+          "id": "hook",
+          "type": "animation",
+          "animationKey": "conveyor-intro",
+          "title": "Meet the pipe: |",
+          "body": "Imagine a little toy train carrying blocks. The pipe symbol `|` is the track that carries things from one command to the next.\n\nThe command on the left sends. The command on the right gets the things.",
+          "code": null
+        },
+        {
+          "id": "pass-it",
+          "type": "split",
+          "title": "Send, then sort",
+          "body": "First, ask for some pretend animal names. Then pass them through the pipe to sort them A to Z.",
+          "code": "Get-Animal | Sort-Object",
+          "explain": "Think: Get the animal names -> pass them along -> put them in order. These are teaching examples, like pretend play."
+        },
+        {
+          "id": "choose",
+          "type": "highlight",
+          "title": "Let only some things through",
+          "body": "A filter is like choosing only the red blocks from a big pile. `Where-Object` lets matching things pass.",
+          "code": "Get-Color | Where-Object Name -eq Red",
+          "explain": "Think: Get the colors -> let only Red through."
+        },
+        {
+          "id": "chain",
+          "type": "animation",
+          "animationKey": "conveyor-chain",
+          "title": "More than one stop",
+          "body": "A pipe train can visit more than one command. Each command does one small job, then passes the things along.",
+          "code": "Get-Animal | Sort-Object | Select-Object -First 2",
+          "explain": "Get animal names -> sort them -> show the first two."
+        },
+        {
+          "id": "practice",
+          "type": "interactive",
+          "title": "Your turn: send it along!",
+          "body": "Can you spot the pipe? Say what happens first, and what happens next.",
+          "code": "Get-Toy | Sort-Object",
+          "explain": "First we get the toy names. The pipe passes them to Sort-Object, which puts them in order. This is a pretend teaching example, not a command supported by the simulator.",
+          "action": {
+            "type": "copy",
+            "label": "Copy example"
+          }
+        }
+      ]
+    },
+    {
+      "id": "variables-labeled-boxes",
+      "title": "Variables: Labeled Toy Boxes",
+      "description": "Give a value a name so you can use it again.",
+      "order": 2,
+      "durationMinutes": 3,
+      "slides": [
+        {
+          "id": "hook",
+          "type": "animation",
+          "animationKey": "variable-box",
+          "title": "A name for your things",
+          "body": "A variable is like a toy box with a label. Put something in the box, and its name helps you find it again.\n\nIn PowerShell, variable names start with `$`.",
+          "code": null
+        },
+        {
+          "id": "make-one",
+          "type": "split",
+          "title": "Make a labeled box",
+          "body": "The equals sign puts a value into the box. Here, `$pet` is the label and `Bunny` is what goes inside.",
+          "code": "$pet = 'Bunny'",
+          "explain": "Read it like: Put Bunny in the box named pet. This is a teaching example; variables are not supported in the simulator yet."
+        },
+        {
+          "id": "use-one",
+          "type": "highlight",
+          "title": "Use the box again",
+          "body": "When you use `$pet`, PowerShell knows you mean the value inside the pet box.",
+          "code": "Write-Output $pet",
+          "explain": "This would show Bunny. The `$` means 'look inside this named box.'"
+        },
+        {
+          "id": "change-one",
+          "type": "animation",
+          "animationKey": "variable-box",
+          "title": "You can change what's inside",
+          "body": "Put a new value in the same box, and the old value is replaced.",
+          "code": "$pet = 'Kitten'\nWrite-Output $pet",
+          "explain": "Now the pet box holds Kitten, so using `$pet` shows Kitten."
+        },
+        {
+          "id": "practice",
+          "type": "interactive",
+          "title": "Your turn: name a snack!",
+          "body": "What snack would you put in a box called `$snack`? Try changing the example value.",
+          "code": "$snack = 'Apple'\nWrite-Output $snack",
+          "explain": "The box named snack holds Apple. Using `$snack` asks for the value inside. This is a teaching example; variables are not supported in the simulator yet.",
+          "action": {
+            "type": "copy",
+            "label": "Copy example"
+          }
+        }
+      ]
+    },
+    {
+      "id": "commands-helpers",
+      "title": "Commands: Little Helpers",
+      "description": "A command is a helper that does a job when you ask.",
+      "order": 3,
+      "durationMinutes": 2,
+      "slides": [
+        { "id": "hook", "type": "animation", "animationKey": "helper", "title": "Ask a helper", "body": "A command is like asking a helper to do one job. PowerShell commands often have a doing word and a thing word.", "code": null },
+        { "id": "example", "type": "split", "title": "Find the things", "body": "`Get-ChildItem` asks to see the things in your pretend workspace.", "code": "Get-ChildItem", "explain": "Get means find or show. ChildItem means the items inside this place. The simulator shows virtual workspace items." },
+        { "id": "practice", "type": "interactive", "title": "Your turn", "body": "Try asking to see the workspace items.", "code": "Get-ChildItem", "explain": "This supported command lists items in the virtual workspace.", "action": { "type": "run-in-terminal", "label": "Run in terminal" } }
+      ]
+    },
+    {
+      "id": "folders-rooms",
+      "title": "Folders: Rooms for Files",
+      "description": "Folders keep related files together.",
+      "order": 4,
+      "durationMinutes": 2,
+      "slides": [
+        { "id": "hook", "type": "animation", "animationKey": "folder-room", "title": "A folder is a room", "body": "Imagine your files are toys. A folder is a room where you keep some toys together.", "code": null },
+        { "id": "example", "type": "split", "title": "Make a room", "body": "Use `New-Item` to make a folder in the virtual workspace.", "code": "New-Item -ItemType Directory -Path Toys", "explain": "This makes a folder named Toys inside PowerShellish's pretend workspace." },
+        { "id": "practice", "type": "interactive", "title": "Your turn", "body": "Make a room called Drawings.", "code": "New-Item -ItemType Directory -Path Drawings", "explain": "This creates a virtual folder. It does not make a folder on your computer.", "action": { "type": "run-in-terminal", "label": "Run in terminal" } }
+      ]
+    },
+    {
+      "id": "files-notebooks",
+      "title": "Files: Little Notebooks",
+      "description": "Create a text file in your workspace.",
+      "order": 5,
+      "durationMinutes": 2,
+      "slides": [
+        { "id": "hook", "type": "animation", "animationKey": "notebook", "title": "A file is a notebook", "body": "A text file is like a little notebook. You can give it a name and write words inside.", "code": null },
+        { "id": "example", "type": "split", "title": "Make a notebook", "body": "Let's make an empty note called hello.txt.", "code": "New-Item -ItemType File -Path hello.txt", "explain": "This creates a text file in the virtual workspace." },
+        { "id": "practice", "type": "interactive", "title": "Your turn", "body": "Make a note called my-story.txt.", "code": "New-Item -ItemType File -Path my-story.txt", "explain": "The file lives in the virtual workspace. You can see it with Get-ChildItem.", "action": { "type": "run-in-terminal", "label": "Run in terminal" } }
+      ]
+    },
+    {
+      "id": "content-sandwich",
+      "title": "File Words: Make a Sandwich",
+      "description": "Put words into a file and read them back.",
+      "order": 6,
+      "durationMinutes": 3,
+      "slides": [
+        { "id": "hook", "type": "animation", "animationKey": "sandwich", "title": "Put words inside", "body": "A file is like a sandwich bag. `Set-Content` puts words in. `Get-Content` takes a peek inside.", "code": null },
+        { "id": "write", "type": "split", "title": "Write a message", "body": "Use `-Path` to name the file and `-Value` to say what goes inside.", "code": "Set-Content -Path hello.txt -Value 'Hello, friend!'", "explain": "This writes Hello, friend! into hello.txt in the virtual workspace." },
+        { "id": "practice", "type": "interactive", "title": "Read your note", "body": "Now ask to see the words in hello.txt.", "code": "Get-Content -Path hello.txt", "explain": "This reads the text from your virtual file.", "action": { "type": "run-in-terminal", "label": "Run in terminal" } }
+      ]
+    },
+    {
+      "id": "parameters-labels",
+      "title": "Parameters: Helpful Labels",
+      "description": "Parameters give a command extra details.",
+      "order": 7,
+      "durationMinutes": 2,
+      "slides": [
+        { "id": "hook", "type": "animation", "animationKey": "labels", "title": "Add a label", "body": "A command can need a little more information. A parameter is like a label on a lunchbox telling us what's inside.", "code": null },
+        { "id": "example", "type": "split", "title": "Tell it which file", "body": "`-Path` is a label that tells the command which file to use.", "code": "Get-Content -Path hello.txt", "explain": "Get-Content reads. -Path hello.txt tells it which virtual file to read." },
+        { "id": "practice", "type": "interactive", "title": "Your turn", "body": "Change the file name to read a different note.", "code": "Get-Content -Path my-story.txt", "explain": "The value after -Path is the file name. This works when that file exists in your workspace.", "action": { "type": "copy", "label": "Copy example" } }
+      ]
+    },
+    {
+      "id": "search-hide-and-seek",
+      "title": "Search: Play Hide and Seek",
+      "description": "Find words inside a file with Select-String.",
+      "order": 8,
+      "durationMinutes": 2,
+      "slides": [
+        { "id": "hook", "type": "animation", "animationKey": "hide-seek", "title": "Find the hidden word", "body": "Searching a file is like looking for one word in a big story. `Select-String` can look for a word in text.", "code": null },
+        { "id": "example", "type": "split", "title": "Look for a word", "body": "Give the search a word and a file to look in.", "code": "Select-String -Path hello.txt -Pattern friend", "explain": "This looks for the word friend in hello.txt. This command is a teaching example and may not run in the simulator." },
+        { "id": "practice", "type": "interactive", "title": "Your turn", "body": "Pick a word you wrote in a file and look for it.", "code": "Select-String -Path hello.txt -Pattern Hello", "explain": "Pattern is the word to find. This example teaches PowerShell syntax; search is not supported by every simulator command set.", "action": { "type": "copy", "label": "Copy example" } }
+      ]
+    },
+    {
+      "id": "sort-toy-shelf",
+      "title": "Sort: Tidy the Toy Shelf",
+      "description": "Put a list in a helpful order.",
+      "order": 9,
+      "durationMinutes": 2,
+      "slides": [
+        { "id": "hook", "type": "animation", "animationKey": "toy-shelf", "title": "Put things in order", "body": "Sorting is like lining up toys from smallest to biggest, or names from A to Z.", "code": null },
+        { "id": "example", "type": "split", "title": "Sort the names", "body": "`Sort-Object` puts the items it receives into order.", "code": "Get-ChildItem | Sort-Object Name", "explain": "Get the virtual workspace items, pass them along, then sort by name." },
+        { "id": "practice", "type": "interactive", "title": "Your turn", "body": "Try sorting your workspace items by name.", "code": "Get-ChildItem | Sort-Object Name", "explain": "The pipe passes the listed items to the sorter.", "action": { "type": "run-in-terminal", "label": "Run in terminal" } }
+      ]
+    },
+    {
+      "id": "export-backpack",
+      "title": "Export: Pack a Copy",
+      "description": "Download a copy of a workspace file to keep.",
+      "order": 10,
+      "durationMinutes": 2,
+      "slides": [
+        { "id": "hook", "type": "animation", "animationKey": "backpack", "title": "Pack your work", "body": "Exporting is like packing a copy of your work into your backpack so you can keep it outside the pretend workspace.", "code": null },
+        { "id": "example", "type": "split", "title": "Download one file", "body": "`Export-File` downloads a copy of a file from the virtual workspace.", "code": "Export-File -Path hello.txt", "explain": "This downloads hello.txt to your device. It does not run a native PowerShell command." },
+        { "id": "practice", "type": "interactive", "title": "Your turn", "body": "If hello.txt exists, download a copy to keep.", "code": "Export-File -Path hello.txt", "explain": "Exporting gives you a copy you can keep. Download your work regularly.", "action": { "type": "run-in-terminal", "label": "Run in terminal" } }
+      ]
+    },
+    {
+      "id": "append-building-blocks",
+      "title": "Add-Content: Add Another Block",
+      "description": "Add new words after the words already in a file.",
+      "order": 11,
+      "slides": [
+        { "id": "hook", "type": "animation", "animationKey": "blocks", "title": "Keep building", "body": "`Set-Content` replaces what's in a file. `Add-Content` is like adding another block to your tower: the old words stay, and new words go at the end.", "code": null },
+        { "id": "example", "type": "split", "title": "Add one more line", "body": "Use `-Value` to say what new words to add.", "code": "Add-Content -Path hello.txt -Value 'See you soon!'", "explain": "This adds See you soon! after the text already in the virtual file." },
+        { "id": "practice", "type": "interactive", "title": "Your turn", "body": "Add a friendly line to hello.txt.", "code": "Add-Content -Path hello.txt -Value 'You are great!'", "explain": "Add-Content keeps the old words and adds these new ones.", "action": { "type": "run-in-terminal", "label": "Run in terminal" } }
+      ]
+    },
+    {
+      "id": "rename-name-tag",
+      "title": "Rename: Give It a New Name",
+      "description": "Change the name of a workspace file or folder.",
+      "order": 12,
+      "slides": [
+        { "id": "hook", "type": "animation", "animationKey": "name-tag", "title": "A new name tag", "body": "Sometimes a toy's name tag needs changing. `Rename-Item` gives a virtual file or folder a new name.", "code": null },
+        { "id": "example", "type": "split", "title": "Change the file name", "body": "Tell PowerShell the current path and the new name.", "code": "Rename-Item -Path hello.txt -NewName welcome.txt", "explain": "This renames hello.txt to welcome.txt in the virtual workspace." },
+        { "id": "practice", "type": "interactive", "title": "Your turn", "body": "If my-story.txt exists, give it the name story.txt.", "code": "Rename-Item -Path my-story.txt -NewName story.txt", "explain": "Rename-Item changes the name in your virtual workspace.", "action": { "type": "run-in-terminal", "label": "Run in terminal" } }
+      ]
+    },
+    {
+      "id": "get-help-map",
+      "title": "Get-Help: Ask for a Map",
+      "description": "Ask for help when you want to learn a command.",
+      "order": 13,
+      "slides": [
+        { "id": "hook", "type": "animation", "animationKey": "map", "title": "It's okay to ask", "body": "When you don't know what a command does, asking for help is a smart next step. It's like asking for a map when you're exploring.", "code": null },
+        { "id": "example", "type": "split", "title": "Show help topics", "body": "Ask `Get-Help` to show the help topics available in PowerShellish.", "code": "Get-Help", "explain": "Get-Help is available in this simulator and introduces commands and lessons." },
+        { "id": "practice", "type": "interactive", "title": "Your turn", "body": "Open the help topics in the terminal.", "code": "Get-Help", "explain": "You can ask for help whenever you need a reminder.", "action": { "type": "run-in-terminal", "label": "Run in terminal" } }
+      ]
+    },
+    {
+      "id": "quotes-speech-bubble",
+      "title": "Quotes: Keep Words Together",
+      "description": "Use quotes to show where your text begins and ends.",
+      "order": 14,
+      "slides": [
+        { "id": "hook", "type": "animation", "animationKey": "speech-bubble", "title": "Put words in a bubble", "body": "Quotes are like a speech bubble around words. They show PowerShell which words belong together as one piece of text.", "code": null },
+        { "id": "example", "type": "split", "title": "Write a whole message", "body": "Put quotes around the message you want to save.", "code": "Set-Content -Path hello.txt -Value 'Hello, my friend!'", "explain": "Everything between the quotes is one message. Set-Content writes it in the virtual file." },
+        { "id": "practice", "type": "interactive", "title": "Your turn", "body": "Change the message inside the quotes to something you like.", "code": "Set-Content -Path hello.txt -Value 'I like rainbows!'", "explain": "Keep the opening and closing quotes so the words stay together.", "action": { "type": "copy", "label": "Copy example" } }
+      ]
+    },
+    {
+      "id": "safe-delete-ask-first",
+      "title": "Remove-Item: Ask Before Tidying",
+      "description": "Learn that deleting needs care and confirmation.",
+      "order": 15,
+      "slides": [
+        { "id": "hook", "type": "animation", "animationKey": "tidy-up", "title": "Check before it goes", "body": "Deleting is like putting a drawing in the recycling bin. Stop and check first, because you may want it later.", "code": null },
+        { "id": "example", "type": "split", "title": "The command asks first", "body": "In PowerShellish, `Remove-Item` shows an in-app confirmation before it removes a virtual item.", "code": "Remove-Item -Path hello.txt", "explain": "The confirmation gives you a chance to cancel. This only removes an item from the virtual workspace." },
+        { "id": "practice", "type": "interactive", "title": "Your turn: look before removing", "body": "Try the command only if you really want to remove hello.txt. Read the confirmation carefully.", "code": "Remove-Item -Path hello.txt", "explain": "You can cancel at the confirmation. Removing a folder also removes the items inside it.", "action": { "type": "copy", "label": "Copy example" } }
+      ]
+    }
+  ]
+}

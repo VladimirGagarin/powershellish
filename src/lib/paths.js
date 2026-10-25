@@ -62,8 +62,9 @@ export function basename(path) {
   return index === -1 ? path : path.slice(index + 1)
 }
 
-export function displayPath(path) {
-  return path ? `C:\\workspace\\${path.replace(/\//g, '\\')}` : 'C:\\workspace'
+export function displayPath(path, user = 'guest') {
+  const userFolder = String(user || 'guest').trim().replace(/[^a-z0-9_-]/gi, '') || 'guest'
+  return path ? `C:\\PS\\${userFolder}\\${path.replace(/\//g, '\\')}` : `C:\\PS\\${userFolder}`
 }
 
 export function isInside(path, parent) {

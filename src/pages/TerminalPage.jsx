@@ -4,7 +4,7 @@ import WorkspaceTree from '../components/WorkspaceTree'
 import FileEditor from '../components/FileEditor'
 import ConfirmDialog from '../components/ConfirmDialog'
 
-export default function TerminalPage({ engine, cwd, nodes, userName, onOpenFile, editor, setEditor, onSaveEditor, onExportEditor, onCloseEditor, clearRequest, onConfirmClear, onCancelClear, onImport, onRefresh }) {
+export default function TerminalPage({ engine, cwd, nodes, userName, onOpenFile, editor, setEditor, onSaveEditor, onExportEditor, onCloseEditor, clearRequest, onConfirmClear, onCancelClear, onImport, onRefresh, onUndo, undoCount }) {
   return (
     <div className="page page-terminal">
       <header className="terminal-page-header">
@@ -34,6 +34,7 @@ export default function TerminalPage({ engine, cwd, nodes, userName, onOpenFile,
       </div>
 
       <div className="terminal-actions">
+        <button type="button" onClick={onUndo} disabled={!undoCount} title="Restore the previous workspace state">Undo workspace{undoCount ? ` · ${undoCount}` : ''}</button>
         <button type="button" onClick={onImport}>Import-File</button>
         <button type="button" onClick={() => engine.execute('Export-Workspace')}>Export-Workspace</button>
         <button type="button" onClick={() => engine.execute('Get-ChildItem')}>Get-ChildItem</button>

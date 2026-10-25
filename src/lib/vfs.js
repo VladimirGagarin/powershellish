@@ -6,26 +6,70 @@ function uid() {
 
 export function createVfs() {
   const rootId = uid()
+  const workspaceId = uid()
+  const now = Date.now()
   const nodes = {
     byId: {
       [rootId]: {
         id: rootId,
         type: 'directory',
-        name: 'workspace',
+        name: 'PS',
         parentId: null,
+        childIds: [workspaceId],
+        createdAt: now,
+        updatedAt: now,
+      },
+      [workspaceId]: {
+        id: workspaceId,
+        type: 'directory',
+        name: 'workspace',
+        parentId: rootId,
         childIds: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: now,
+        updatedAt: now,
       },
     },
     rootId,
-    version: 1,
+    version: 2,
   }
   return nodes
 }
 
 function clone(nodes) {
   return JSON.parse(JSON.stringify(nodes))
+}
+
+export function migrateVfs(nodes, activePath = '') {
+  if (!nodes?.byId?.[nodes.rootId] || nodes.version >= 2) return nodes
+  const next = clone(nodes)
+  const root = next.byId[next.rootId]
+  const now = Date.now()
+  const workspaceId = uid()
+  const activeRoot = String(activePath || '').split('/').filter(Boolean)[0]
+  next.byId[workspaceId] = {
+    id: workspaceId,
+    type: 'directory',
+    name: 'workspace',
+    parentId: next.rootId,
+    childIds: [],
+    createdAt: now,
+    updatedAt: now,
+  }
+  const keepAtRoot = []
+  for (const id of root.childIds || []) {
+    const child = next.byId[id]
+    if (!child) continue
+    if (activeRoot && child.name === activeRoot) keepAtRoot.push(id)
+    else {
+      child.parentId = workspaceId
+      next.byId[workspaceId].childIds.push(id)
+    }
+  }
+  root.name = 'PS'
+  root.childIds = [workspaceId, ...keepAtRoot]
+  root.updatedAt = now
+  next.version = 2
+  return next
 }
 
 function ensureDirectory(nodes, dirPath) {
@@ -71,7 +115,11 @@ function findChild(nodes, parentId, name) {
 }
 
 function pathToId(nodes, path, cwd = '') {
-  if (!path) return nodes.rootId
+  if (!path) {
+    if (!cwd) return nodes.rootId
+    path = cwd
+    cwd = ''
+  }
   const normalized = normalizePath(path, cwd)
   if (!normalized.ok) return { error: normalized.error }
   if (!normalized.path) return nodes.rootId

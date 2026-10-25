@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import process from 'node:process'
 
 const commitMessage = process.argv.slice(2).join(' ').trim()
 
